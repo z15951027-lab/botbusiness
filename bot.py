@@ -162,6 +162,14 @@ class Database:
                 PRIMARY KEY (business_connection_id, chat_id)
             );
 
+            CREATE TABLE IF NOT EXISTS swear_offenses (
+                business_connection_id TEXT NOT NULL,
+                chat_id INTEGER NOT NULL,
+                count INTEGER NOT NULL,
+                window_started_at INTEGER NOT NULL,
+                PRIMARY KEY (business_connection_id, chat_id)
+            );
+
             CREATE TABLE IF NOT EXISTS busy_chats (
                 business_connection_id TEXT NOT NULL,
                 chat_id INTEGER NOT NULL,
@@ -422,6 +430,31 @@ class Database:
             (business_connection_id, chat_id),
         ).fetchone()
         return row is not None
+
+    def register_swear_offense(self, business_connection_id: str, chat_id: int) -> int:
+        """Считает мат в чате за скользящие сутки. Возвращает номер нарушения (1, 2, 3...)."""
+        now = int(time.time())
+        row = self.conn.execute(
+            "SELECT count, window_started_at FROM swear_offenses WHERE business_connection_id = ? AND chat_id = ?",
+            (business_connection_id, chat_id),
+        ).fetchone()
+        if row is None or now - int(row["window_started_at"]) >= 24 * 60 * 60:
+            count = 1
+            self.conn.execute(
+                "INSERT INTO swear_offenses(business_connection_id, chat_id, count, window_started_at) "
+                "VALUES(?, ?, ?, ?) "
+                "ON CONFLICT(business_connection_id, chat_id) DO UPDATE SET count = excluded.count, "
+                "window_started_at = excluded.window_started_at",
+                (business_connection_id, chat_id, count, now),
+            )
+        else:
+            count = int(row["count"]) + 1
+            self.conn.execute(
+                "UPDATE swear_offenses SET count = ? WHERE business_connection_id = ? AND chat_id = ?",
+                (count, business_connection_id, chat_id),
+            )
+        self.conn.commit()
+        return count
 
     def add_busy(self, business_connection_id: str, chat_id: int) -> None:
         self.conn.execute(
@@ -1647,7 +1680,11 @@ class HelperBot:
         swear_all = self.db.get_owner_setting(owner_user_id, "swear_all", "0") == "1"
         swear_watch = swear_all or self.db.is_swear_watch_enabled(business_connection_id, int(chat_id))
         if not is_owner_message and swear_watch and text and self.contains_swear(text):
-            await self.send_business_message_and_remember(chat_id, SWEAR_WARNING, business_connection_id, parse_mode="HTML")
+            offense_number = self.db.register_swear_offense(business_connection_id, int(chat_id))
+            if offense_number <= 1:
+                await self.send_business_message_and_remember(chat_id, SWEAR_WARNING, business_connection_id, parse_mode="HTML")
+            else:
+                await self.api.delete_business_messages(business_connection_id, [int(message_id)])
 
         busy_all = self.db.get_owner_setting(owner_user_id, "busy_all", "0") == "1"
         busy_local = self.db.is_busy_enabled(business_connection_id, int(chat_id))
