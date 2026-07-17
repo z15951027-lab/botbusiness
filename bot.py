@@ -68,28 +68,71 @@ PUBLIC_INFO_TEXT = (
 HELP_TEXT = """✨ <b>Chat Manager — инструкция</b>
 
 <b>🏠 Личка с ботом</b>
-<code>/settings</code> — главная панель
-<code>/id</code> — узнать Telegram ID
-<code>/invite</code> — создать код доступа
-<code>/users</code> — клиенты, только главный админ
-<code>/deluser ID</code> — удалить клиента
-<code>/spamtest 10 текст</code> — тест сообщений себе
+<blockquote>⚙️ <b>/settings</b>
+└ Главная панель
 
-<b>💬 Business-чат</b>
-<code>.status</code> — статус чата
-<code>.busy</code> — автоответ «я занят» тут
-<code>.skip</code> — исключить чат из общего режима
-<code>.mat</code> — анти-мат тут
-<code>.mute</code> / <code>.mute 10m</code> — мут навсегда или на время
-<code>.unmute</code> — снять мут
-<code>.clean 50</code> — удалить последние сообщения
-<code>.on</code> / <code>.off</code> — тестовый режим для <code>.spam</code>
-<code>.spam 10 текст</code> — до 30 отдельных сообщений только в тестовом чате
+🆔 <b>/id</b>
+└ Узнать свой Telegram ID
+
+✉️ <b>/invite</b>
+└ Создать код доступа (гл. админ)
+
+👥 <b>/users</b>
+└ Список клиентов (гл. админ)
+
+🗑️ <b>/deluser ID</b>
+└ Удалить клиента (гл. админ)
+
+🧪 <b>/spamtest 10 текст</b>
+└ Тест сообщений самому себе</blockquote>
+
+<b>💬 Команды в Business-чате</b>
+<blockquote>📌 <b>/status</b>
+└ Красиво показать статус чата
+
+⏳ <b>/busy</b>
+└ Автоответ «я занят» только тут
+
+🙅 <b>/skip</b>
+└ Исключить чат из общего режима «занят»
+
+🧼 <b>/mat</b>
+└ Анти-мат только в этом чате
+
+🔇 <b>/mute</b> · <b>/mute 10m</b>
+└ Мут навсегда или на время (s/m/h/d)
+
+🔊 <b>/unmute</b>
+└ Снять мут
+
+🧹 <b>/clean 50</b>
+└ Удалить последние 50 сообщений
+
+🧪 <b>/on</b> · <b>/off</b>
+└ Разрешить/запретить тестовый /spam
+
+📨 <b>/spam 10 текст</b>
+└ До 30 сообщений, только в тестовом чате
+
+❤️ <b>/love</b>
+└ Тёплая анимация в чат
+
+🪙 <b>/flip</b>
+└ Подбросить монетку
+
+✊ <b>/rps камень</b>
+└ Камень-ножницы-бумага с ботом
+
+🎬 <b>/anim текст</b>
+└ Анимированное появление текста</blockquote>
+
+<b>⚡️ Автоматически</b>
+<blockquote>🧹 Анти-спам удаляет лишние сообщения, если собеседник пишет больше 5 сообщений за 5 секунд.</blockquote>
 
 <b>🚀 Быстрый старт</b>
 1. Открой <code>/settings</code>.
 2. Подключи бота в Telegram Business.
-3. В нужном чате напиши <code>.status</code>.
+3. В нужном чате напиши <code>/status</code>.
 
 <b>Важно</b>: для удаления сообщений нужны права Telegram Business на удаление."""
 
@@ -1063,6 +1106,9 @@ class HelperBot:
     def enabled_label(self, value: bool) -> str:
         return "вкл" if value else "выкл"
 
+    def enabled_dot(self, value: bool) -> str:
+        return "🟢" if value else "🔴"
+
     def contains_swear(self, text: str) -> bool:
         words = re.findall(r"[a-zа-яё0-9*]+", text.lower())
         for word in words:
@@ -1150,24 +1196,24 @@ class HelperBot:
         keyboard = [
             [
                 {
-                    "text": f"Анти-мат во всех чатах: {self.enabled_label(swear_all)}",
+                    "text": f"{self.enabled_dot(swear_all)} 🧼 Анти-мат везде: {self.enabled_label(swear_all)}",
                     "callback_data": "toggle:swear_all",
                 }
             ],
             [
                 {
-                    "text": f"Автоответ 'я занят': {self.enabled_label(busy_all)}",
+                    "text": f"{self.enabled_dot(busy_all)} ⏳ Автоответ «я занят»: {self.enabled_label(busy_all)}",
                     "callback_data": "toggle:busy_all",
                 }
             ],
             [
-                {"text": "Статистика", "callback_data": "view:stats"},
-                {"text": "Что умеет", "callback_data": "view:help"},
+                {"text": "📊 Статистика", "callback_data": "view:stats"},
+                {"text": "❓ Что умеет", "callback_data": "view:help"},
             ],
         ]
         if self.is_superadmin(owner_user_id) and self.is_admin_unlocked(owner_user_id):
-            keyboard.append([{"text": "Клиенты", "callback_data": "admin:users"}])
-        keyboard.append([{"text": "Обновить", "callback_data": "panel:main"}])
+            keyboard.append([{"text": "👥 Клиенты", "callback_data": "admin:users"}])
+        keyboard.append([{"text": "🔄 Обновить", "callback_data": "panel:main"}])
         return {"inline_keyboard": keyboard}
 
     def settings_text(self, owner_user_id: int | None) -> str:
@@ -1179,10 +1225,11 @@ class HelperBot:
             "Управление личными чатами Telegram Business\n\n"
             f"👤 Профиль: <b>{html.escape(owner_name)}</b>\n\n"
             "<b>🌐 Глобальные режимы</b>\n"
-            f"🧼 Анти-мат: <b>{html.escape(self.enabled_label(swear_all))}</b>\n"
-            f"⏳ Автоответ «я занят»: <b>{html.escape(self.enabled_label(busy_all))}</b>\n\n"
+            f"{self.enabled_dot(swear_all)} Анти-мат: <b>{html.escape(self.enabled_label(swear_all))}</b>\n"
+            f"{self.enabled_dot(busy_all)} Автоответ «я занят»: <b>{html.escape(self.enabled_label(busy_all))}</b>\n\n"
             "<b>💬 Команды в конкретном чате</b>\n"
-            "<code>.status</code> · <code>.busy</code> · <code>.mat</code> · <code>.skip</code> · <code>.clean 50</code>\n\n"
+            "<blockquote><code>/status</code> · <code>/busy</code> · <code>/mat</code> · <code>/skip</code> · <code>/clean 50</code>\n"
+            "<code>/love</code> · <code>/flip</code> · <code>/rps</code> · <code>/anim текст</code></blockquote>\n\n"
             "<i>Нажимай кнопки ниже — изменения применяются сразу.</i>"
         )
 
@@ -1201,23 +1248,40 @@ class HelperBot:
 
     def help_panel_text(self) -> str:
         return (
-            "<b>Что умеет Chat Manager</b>\n\n"
-            "<b>Личка с ботом</b>\n"
-            "<code>/id</code> - узнать свой ID\n"
-            "<code>/settings</code> - открыть панель\n\n"
-            "<b>Business-чат с человеком</b>\n"
-            "<code>.status</code> - красиво показать статус чата\n"
-            "<code>.busy</code> - переключить автоответ только тут\n"
-            "<code>.skip</code> - не применять общий режим занят к этому чату\n"
-            "<code>.mat</code> - переключить анти-мат только тут\n"
-            "<code>.mute</code> - мут навсегда\n"
-            "<code>.mute 10m</code> - мут на время: s/m/h/d\n"
-            "<code>.unmute</code> - снять мут\n"
-            "<code>.clean 50</code> - удалить последние 50 сообщений\n"
-            "<code>.on</code> - разрешить тестовый спам в этом чате\n"
-            "<code>.off</code> - запретить тестовый спам\n"
-            "<code>.spam 10 текст</code> - отдельные сообщения только в тестовом чате, максимум 30\n"
-            "\n<b>Автоматически</b>\n"
+            "✨ <b>Что умеет Chat Manager</b>\n\n"
+            "<b>🏠 Личка с ботом</b>\n"
+            "<blockquote>🆔 <b>/id</b>\n"
+            "└ Узнать свой ID\n\n"
+            "⚙️ <b>/settings</b>\n"
+            "└ Открыть панель</blockquote>\n\n"
+            "<b>💬 Business-чат с человеком</b>\n"
+            "<blockquote>📌 <b>/status</b>\n"
+            "└ Красиво показать статус чата\n\n"
+            "⏳ <b>/busy</b>\n"
+            "└ Переключить автоответ только тут\n\n"
+            "🙅 <b>/skip</b>\n"
+            "└ Не применять общий режим «занят» к этому чату\n\n"
+            "🧼 <b>/mat</b>\n"
+            "└ Переключить анти-мат только тут\n\n"
+            "🔇 <b>/mute</b> / <b>/mute 10m</b>\n"
+            "└ Мут навсегда или на время: s/m/h/d\n\n"
+            "🔊 <b>/unmute</b>\n"
+            "└ Снять мут\n\n"
+            "🧹 <b>/clean 50</b>\n"
+            "└ Удалить последние 50 сообщений\n\n"
+            "🧪 <b>/on</b> / <b>/off</b>\n"
+            "└ Разрешить/запретить тестовый /spam\n\n"
+            "📨 <b>/spam 10 текст</b>\n"
+            "└ Отдельные сообщения только в тестовом чате, максимум 30\n\n"
+            "❤️ <b>/love</b>\n"
+            "└ Тёплая анимация в чат\n\n"
+            "🪙 <b>/flip</b>\n"
+            "└ Подбросить монетку\n\n"
+            "✊ <b>/rps камень</b>\n"
+            "└ Камень-ножницы-бумага с ботом\n\n"
+            "🎬 <b>/anim текст</b>\n"
+            "└ Анимированное появление текста</blockquote>\n\n"
+            "<b>⚡️ Автоматически</b>\n"
             "Анти-спам удаляет лишние сообщения, если собеседник пишет больше 5 сообщений за 5 секунд."
         )
 
@@ -1297,7 +1361,7 @@ class HelperBot:
         successful_payment = message.get("successful_payment")
 
         if successful_payment is not None:
-            await self.handle_successful_payment(chat_id, user_id, successful_payment)
+            await self.handle_successful_payment(chat_id, user_id, message.get("message_id"), successful_payment)
             return
 
         if user_id is not None and self.is_superadmin(user_id) and text.strip().lower() == ADMIN_CODEWORD.lower():
@@ -1466,6 +1530,7 @@ class HelperBot:
         self,
         chat_id: int | None,
         user_id: int | None,
+        message_id: int | None,
         payment: dict[str, Any],
     ) -> None:
         if chat_id is None or user_id is None:
@@ -1473,11 +1538,15 @@ class HelperBot:
         if payment.get("invoice_payload") != STAR_KEY_PAYLOAD:
             return
         self.db.set_setting(f"register_state:{user_id}", "awaiting_name")
+        if message_id is not None:
+            # Убираем системное сообщение о платеже (чек со звёздами), чтобы в чате
+            # сразу была чистая инструкция, а не квитанция об оплате.
+            await self.api.try_call("deleteMessage", {"chat_id": chat_id, "message_id": message_id})
         await self.api.send_message(
             chat_id,
-            "<b>Оплата получена ⭐</b>\n\n"
-            "Ключ доступа активирован.\n\n"
-            "Теперь напиши имя, которое будет в автоответах.\n\n"
+            "✅ <b>Оплата получена ⭐</b>\n\n"
+            "🔑 Ключ доступа активирован.\n\n"
+            "✍️ Теперь напиши имя, которое будет в автоответах.\n\n"
             "Например: <code>Артем</code>",
             parse_mode="HTML",
         )
@@ -1654,7 +1723,7 @@ class HelperBot:
         )
 
         is_owner_message = from_user_id == owner_user_id
-        if text.startswith(".") and is_owner_message:
+        if text.startswith("/") and is_owner_message:
             await self.handle_business_command(
                 business_connection_id=business_connection_id,
                 chat_id=int(chat_id),
@@ -1710,7 +1779,7 @@ class HelperBot:
         parts = text.split()
         command = parts[0].lower()
 
-        if command == ".mute":
+        if command == "/mute":
             mute_until = None
             if len(parts) > 1:
                 duration_seconds = self.parse_duration_seconds(parts[1])
@@ -1718,8 +1787,8 @@ class HelperBot:
                     await self.api.delete_business_messages(business_connection_id, [message_id])
                     await self.send_temporary_business_message(
                         chat_id,
-                        "Формат времени: <code>.mute 10m</code>, <code>.mute 2h</code>, <code>.mute 1d</code>.\n"
-                        "Без времени: <code>.mute</code> навсегда.",
+                        "Формат времени: <code>/mute 10m</code>, <code>/mute 2h</code>, <code>/mute 1d</code>.\n"
+                        "Без времени: <code>/mute</code> навсегда.",
                         business_connection_id,
                         parse_mode="HTML",
                     )
@@ -1732,11 +1801,11 @@ class HelperBot:
             else:
                 reply = f"Ок, этот чат замучен на {self.format_duration(mute_until - int(time.time()))}."
             await self.send_temporary_business_message(chat_id, reply, business_connection_id)
-        elif command == ".unmute":
+        elif command == "/unmute":
             self.db.remove_mute(business_connection_id, chat_id)
             await self.api.delete_business_messages(business_connection_id, [message_id])
             await self.send_temporary_business_message(chat_id, "Ок, этот чат размучен.", business_connection_id)
-        elif command == ".status":
+        elif command == "/status":
             muted = self.db.is_muted(business_connection_id, chat_id)
             mute_until = self.db.mute_until(business_connection_id, chat_id) if muted else None
             if muted and mute_until is not None:
@@ -1755,14 +1824,14 @@ class HelperBot:
             status = (
                 "📌 <b>Статус чата</b>\n\n"
                 f"👤 Владелец: <b>{html.escape(owner_name)}</b>\n"
-                f"🔇 Мут: <b>{html.escape(mute_label)}</b>\n"
-                f"🧼 Анти-мат: <b>{html.escape(self.enabled_label(chat_swear))}</b>\n"
-                f"⏳ Я занят: <b>{html.escape(self.enabled_label(chat_busy))}</b>\n"
-                f"⭐ Исключение: <b>{html.escape(self.enabled_label(busy_excluded))}</b>\n"
-                f"🧪 Тестовый режим: <b>{html.escape(self.enabled_label(test_chat))}</b>\n\n"
+                f"{self.enabled_dot(muted)} Мут: <b>{html.escape(mute_label)}</b>\n"
+                f"{self.enabled_dot(chat_swear)} Анти-мат: <b>{html.escape(self.enabled_label(chat_swear))}</b>\n"
+                f"{self.enabled_dot(chat_busy)} Я занят: <b>{html.escape(self.enabled_label(chat_busy))}</b>\n"
+                f"{self.enabled_dot(busy_excluded)} Исключение: <b>{html.escape(self.enabled_label(busy_excluded))}</b>\n"
+                f"{self.enabled_dot(test_chat)} Тестовый режим: <b>{html.escape(self.enabled_label(test_chat))}</b>\n\n"
                 "🌐 <b>Глобально</b>\n"
-                f"🧼 Анти-мат везде: <b>{html.escape(self.enabled_label(swear_all))}</b>\n"
-                f"⏳ Я занят везде: <b>{html.escape(self.enabled_label(busy_all))}</b>"
+                f"{self.enabled_dot(swear_all)} Анти-мат везде: <b>{html.escape(self.enabled_label(swear_all))}</b>\n"
+                f"{self.enabled_dot(busy_all)} Я занят везде: <b>{html.escape(self.enabled_label(busy_all))}</b>"
             )
             await self.api.delete_business_messages(business_connection_id, [message_id])
             await self.send_temporary_business_message(
@@ -1772,7 +1841,7 @@ class HelperBot:
                 parse_mode="HTML",
                 delay_seconds=STATUS_NOTICE_SECONDS,
             )
-        elif command == ".mat":
+        elif command == "/mat":
             if self.db.is_swear_watch_enabled(business_connection_id, chat_id):
                 self.db.remove_swear_watch(business_connection_id, chat_id)
                 reply = "Анти-мат выключен для этого чата."
@@ -1781,7 +1850,7 @@ class HelperBot:
                 reply = "Анти-мат включен для этого чата."
             await self.api.delete_business_messages(business_connection_id, [message_id])
             await self.send_temporary_business_message(chat_id, reply, business_connection_id)
-        elif command == ".busy":
+        elif command == "/busy":
             if self.db.is_busy_enabled(business_connection_id, chat_id):
                 self.db.remove_busy(business_connection_id, chat_id)
                 reply = "Режим 'я занят' выключен для этого чата."
@@ -1790,7 +1859,7 @@ class HelperBot:
                 reply = "Режим 'я занят' включен для этого чата."
             await self.api.delete_business_messages(business_connection_id, [message_id])
             await self.send_temporary_business_message(chat_id, reply, business_connection_id)
-        elif command == ".skip":
+        elif command == "/skip":
             if self.db.is_busy_excluded(business_connection_id, chat_id):
                 self.db.remove_busy_exclusion(business_connection_id, chat_id)
                 reply = "Ок, этот чат снова подчиняется общему режиму 'я занят'."
@@ -1799,25 +1868,25 @@ class HelperBot:
                 reply = "Ок, этот чат исключен из общего режима 'я занят'. Можно спокойно переписываться."
             await self.api.delete_business_messages(business_connection_id, [message_id])
             await self.send_temporary_business_message(chat_id, reply, business_connection_id)
-        elif command == ".on":
+        elif command == "/on":
             self.db.add_test_chat(business_connection_id, chat_id)
             await self.api.delete_business_messages(business_connection_id, [message_id])
             await self.send_temporary_business_message(
                 chat_id,
-                "🧪 <b>Тестовый режим включен</b>\nТеперь тут работает <code>.spam 10 текст</code> до 30 сообщений.",
+                "🧪 <b>Тестовый режим включен</b>\nТеперь тут работает <code>/spam 10 текст</code> до 30 сообщений.",
                 business_connection_id,
                 parse_mode="HTML",
             )
-        elif command == ".off":
+        elif command == "/off":
             self.db.remove_test_chat(business_connection_id, chat_id)
             await self.api.delete_business_messages(business_connection_id, [message_id])
             await self.send_temporary_business_message(
                 chat_id,
-                "🧪 <b>Тестовый режим выключен</b>\n<code>.spam</code> в этом чате больше не работает.",
+                "🧪 <b>Тестовый режим выключен</b>\n<code>/spam</code> в этом чате больше не работает.",
                 business_connection_id,
                 parse_mode="HTML",
             )
-        elif command == ".clean":
+        elif command == "/clean":
             limit = 50
             if len(parts) > 1 and parts[1].isdigit():
                 limit = max(1, min(int(parts[1]), 500))
@@ -1829,12 +1898,12 @@ class HelperBot:
                 f"Удаляю последние сообщения: {len(ids)}",
                 business_connection_id,
             )
-        elif command in {".spam", ".testspam"}:
+        elif command in {"/spam", "/testspam"}:
             await self.api.delete_business_messages(business_connection_id, [message_id])
             if not self.db.is_test_chat(business_connection_id, chat_id):
                 await self.send_temporary_business_message(
                     chat_id,
-                    "🧪 <code>.spam</code> работает только в тестовом чате. Сначала включи <code>.on</code>.",
+                    "🧪 <code>/spam</code> работает только в тестовом чате. Сначала включи <code>/on</code>.",
                     business_connection_id,
                     parse_mode="HTML",
                 )
@@ -1842,7 +1911,7 @@ class HelperBot:
             if len(parts) < 3 or not parts[1].isdigit():
                 await self.send_temporary_business_message(
                     chat_id,
-                    "Формат: <code>.spam 10 текст</code>\nЛимит: до 30 отдельных сообщений.",
+                    "Формат: <code>/spam 10 текст</code>\nЛимит: до 30 отдельных сообщений.",
                     business_connection_id,
                     parse_mode="HTML",
                 )
@@ -1852,7 +1921,7 @@ class HelperBot:
             if not test_text:
                 await self.send_temporary_business_message(
                     chat_id,
-                    "Текст для <code>.spam</code> пустой.",
+                    "Текст для <code>/spam</code> пустой.",
                     business_connection_id,
                     parse_mode="HTML",
                 )
@@ -1864,6 +1933,34 @@ class HelperBot:
                 parse_mode="HTML",
             )
             asyncio.create_task(self.send_test_spam_messages(chat_id, test_text, business_connection_id, repeat_count))
+        elif command == "/love":
+            await self.api.delete_business_messages(business_connection_id, [message_id])
+            await self.send_love_animation(chat_id, business_connection_id)
+        elif command == "/flip":
+            await self.api.delete_business_messages(business_connection_id, [message_id])
+            result = secrets.choice(["🦅 Орёл", "🔢 Решка"])
+            await self.send_temporary_business_message(
+                chat_id,
+                f"🪙 <b>Монетка:</b> {result}",
+                business_connection_id,
+                parse_mode="HTML",
+                delay_seconds=15,
+            )
+        elif command == "/rps":
+            await self.api.delete_business_messages(business_connection_id, [message_id])
+            await self.handle_rps_command(chat_id, business_connection_id, parts)
+        elif command == "/anim":
+            await self.api.delete_business_messages(business_connection_id, [message_id])
+            phrase = " ".join(parts[1:]).strip()[:200]
+            if not phrase:
+                await self.send_temporary_business_message(
+                    chat_id,
+                    "Формат: <code>/anim текст</code>",
+                    business_connection_id,
+                    parse_mode="HTML",
+                )
+                return
+            asyncio.create_task(self.send_anim_message(chat_id, business_connection_id, phrase))
         else:
             await self.send_temporary_business_message(
                 chat_id,
@@ -1871,14 +1968,84 @@ class HelperBot:
                 business_connection_id,
             )
 
+    async def send_love_animation(self, chat_id: int, business_connection_id: str) -> None:
+        frames = ["🤍", "💛", "🧡", "❤️", "❤️❤️❤️"]
+        sent = await self.api.send_message(chat_id, frames[0], business_connection_id=business_connection_id)
+        if not isinstance(sent, dict) or sent.get("message_id") is None:
+            return
+        message_id = int(sent["message_id"])
+        for frame in frames[1:]:
+            await asyncio.sleep(0.5)
+            await self.api.edit_message_text(chat_id, message_id, frame)
+        await asyncio.sleep(3)
+        await self.api.delete_business_messages(business_connection_id, [message_id])
+
+    async def handle_rps_command(
+        self,
+        chat_id: int,
+        business_connection_id: str,
+        parts: list[str],
+    ) -> None:
+        moves = {
+            "камень": "🪨", "ножницы": "✂️", "бумага": "📄",
+            "rock": "🪨", "scissors": "✂️", "paper": "📄",
+        }
+        beats = {"камень": "ножницы", "ножницы": "бумага", "бумага": "камень"}
+        alias = {"rock": "камень", "scissors": "ножницы", "paper": "бумага"}
+
+        if len(parts) < 2 or parts[1].lower() not in moves:
+            await self.send_temporary_business_message(
+                chat_id,
+                "Формат: <code>/rps камень</code>, <code>/rps ножницы</code> или <code>/rps бумага</code>",
+                business_connection_id,
+                parse_mode="HTML",
+            )
+            return
+
+        user_move = alias.get(parts[1].lower(), parts[1].lower())
+        bot_move = secrets.choice(list(beats.keys()))
+
+        if user_move == bot_move:
+            outcome = "🤝 Ничья!"
+        elif beats[user_move] == bot_move:
+            outcome = "🎉 Ты выиграл!"
+        else:
+            outcome = "🤖 Бот выиграл!"
+
+        await self.send_temporary_business_message(
+            chat_id,
+            f"✊ Ты: {moves[user_move]}  vs  Бот: {moves[bot_move]}\n{outcome}",
+            business_connection_id,
+            delay_seconds=15,
+        )
+
+    async def send_anim_message(self, chat_id: int, business_connection_id: str, phrase: str) -> None:
+        sent = await self.api.send_message(chat_id, "▫️", business_connection_id=business_connection_id)
+        if not isinstance(sent, dict) or sent.get("message_id") is None:
+            return
+        message_id = int(sent["message_id"])
+        built = ""
+        for char in phrase:
+            built += char
+            await asyncio.sleep(0.05)
+            await self.api.edit_message_text(chat_id, message_id, built + "▌")
+        await self.api.edit_message_text(chat_id, message_id, built)
+
 
 def load_config() -> Config:
     load_dotenv()
-    token = os.getenv("BOT_TOKEN", "").strip() or "8810713323:AAG2f-SpxRooWTarnGrpfPDx0KwfaoXZrXE"
+    token = os.getenv("BOT_TOKEN", "").strip()
     if not token:
-        raise RuntimeError("BOT_TOKEN is empty. Create .env from .env.example and paste your bot token.")
+        raise RuntimeError(
+            "BOT_TOKEN is empty. Create .env from .env.example (or set the variable on your host) "
+            "and paste your bot token there. No fallback token is used anymore."
+        )
 
-    raw_admin_id = os.getenv("ADMIN_USER_ID", "").strip() or "1400515994"
+    raw_admin_id = os.getenv("ADMIN_USER_ID", "").strip()
+    if not raw_admin_id:
+        raise RuntimeError(
+            "ADMIN_USER_ID is empty. Set it in .env or your host's environment variables to your numeric Telegram ID."
+        )
     admin_user_id = int(raw_admin_id) if raw_admin_id else None
     return Config(
         token=token,
