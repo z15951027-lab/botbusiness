@@ -84,7 +84,10 @@ HELP_TEXT = """✨ <b>Chat Manager — инструкция</b>
 └ Удалить клиента (гл. админ)
 
 🧪 <b>/spamtest 10 текст</b>
-└ Тест сообщений самому себе</blockquote>
+└ Тест сообщений самому себе
+
+👋 <b>/privet текст</b>
+└ Задать приветствие для новых людей</blockquote>
 
 <b>💬 Команды в Business-чате</b>
 <blockquote>📌 <b>/status</b>
@@ -117,8 +120,8 @@ HELP_TEXT = """✨ <b>Chat Manager — инструкция</b>
 ❤️ <b>/love</b>
 └ Тёплая анимация в чат
 
-🪙 <b>/flip</b>
-└ Подбросить монетку
+🎰 <b>/kazino</b>
+└ Слот-машина на удачу
 
 ✊ <b>/rps камень</b>
 └ Камень-ножницы-бумага с ботом
@@ -623,6 +626,13 @@ class Database:
         )
         self.conn.commit()
 
+    def chat_exists(self, business_connection_id: str, chat_id: int) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM managed_chats WHERE business_connection_id = ? AND chat_id = ?",
+            (business_connection_id, chat_id),
+        ).fetchone()
+        return row is not None
+
     def count_managed_chats(self, owner_user_id: int | None = None) -> int:
         if owner_user_id is None:
             row = self.conn.execute("SELECT COUNT(*) AS count FROM managed_chats").fetchone()
@@ -892,6 +902,7 @@ class TelegramAPI:
                     {"command": "id", "description": "Узнать свой Telegram ID"},
                     {"command": "settings", "description": "Главная панель"},
                     {"command": "spamtest", "description": "Тест сообщений себе"},
+                    {"command": "privet", "description": "Приветствие для новых людей"},
                 ]
             },
         )
@@ -926,6 +937,23 @@ class TelegramAPI:
         if error_message:
             payload["error_message"] = error_message
         return await self.try_call("answerPreCheckoutQuery", payload)
+
+    async def get_business_connection(self, business_connection_id: str) -> Any:
+        return await self.try_call(
+            "getBusinessConnection",
+            {"business_connection_id": business_connection_id},
+        )
+
+    async def send_dice(
+        self,
+        chat_id: int,
+        emoji: str,
+        business_connection_id: str | None = None,
+    ) -> Any:
+        payload: dict[str, Any] = {"chat_id": chat_id, "emoji": emoji}
+        if business_connection_id:
+            payload["business_connection_id"] = business_connection_id
+        return await self.try_call("sendDice", payload)
 
     async def delete_business_messages(
         self,
@@ -1122,6 +1150,19 @@ class HelperBot:
         name = " ".join(part for part in parts if part)
         return name or chat.get("username") or chat.get("title") or str(chat.get("id"))
 
+    def remember_registration_message(self, user_id: int, message_id: int) -> None:
+        existing = self.db.get_setting(f"register_msgs:{user_id}", "")
+        ids = [item for item in existing.split(",") if item]
+        ids.append(str(message_id))
+        self.db.set_setting(f"register_msgs:{user_id}", ",".join(ids))
+
+    async def cleanup_registration_messages(self, chat_id: int, user_id: int) -> None:
+        existing = self.db.get_setting(f"register_msgs:{user_id}", "")
+        ids = [int(item) for item in existing.split(",") if item.isdigit()]
+        for message_id in ids:
+            await self.api.try_call("deleteMessage", {"chat_id": chat_id, "message_id": message_id})
+        self.db.set_setting(f"register_msgs:{user_id}", "")
+
     async def send_business_message_and_remember(
         self,
         chat_id: int,
@@ -1229,7 +1270,7 @@ class HelperBot:
             f"{self.enabled_dot(busy_all)} Автоответ «я занят»: <b>{html.escape(self.enabled_label(busy_all))}</b>\n\n"
             "<b>💬 Команды в конкретном чате</b>\n"
             "<blockquote><code>/status</code> · <code>/busy</code> · <code>/mat</code> · <code>/skip</code> · <code>/clean 50</code>\n"
-            "<code>/love</code> · <code>/flip</code> · <code>/rps</code> · <code>/anim текст</code></blockquote>\n\n"
+            "<code>/love</code> · <code>/kazino</code> · <code>/rps</code> · <code>/anim текст</code></blockquote>\n\n"
             "<i>Нажимай кнопки ниже — изменения применяются сразу.</i>"
         )
 
@@ -1253,7 +1294,9 @@ class HelperBot:
             "<blockquote>🆔 <b>/id</b>\n"
             "└ Узнать свой ID\n\n"
             "⚙️ <b>/settings</b>\n"
-            "└ Открыть панель</blockquote>\n\n"
+            "└ Открыть панель\n\n"
+            "👋 <b>/privet текст</b>\n"
+            "└ Задать приветствие для новых людей</blockquote>\n\n"
             "<b>💬 Business-чат с человеком</b>\n"
             "<blockquote>📌 <b>/status</b>\n"
             "└ Красиво показать статус чата\n\n"
@@ -1273,10 +1316,12 @@ class HelperBot:
             "└ Разрешить/запретить тестовый /spam\n\n"
             "📨 <b>/spam 10 текст</b>\n"
             "└ Отдельные сообщения только в тестовом чате, максимум 30\n\n"
+            "🧪 <b>/spamtest 10 текст</b>\n"
+            "└ То же самое, но сразу в этом чате, без /on, максимум 20\n\n"
             "❤️ <b>/love</b>\n"
             "└ Тёплая анимация в чат\n\n"
-            "🪙 <b>/flip</b>\n"
-            "└ Подбросить монетку\n\n"
+            "🎰 <b>/kazino</b>\n"
+            "└ Слот-машина на удачу\n\n"
             "✊ <b>/rps камень</b>\n"
             "└ Камень-ножницы-бумага с ботом\n\n"
             "🎬 <b>/anim текст</b>\n"
@@ -1454,6 +1499,39 @@ class HelperBot:
                 "4. Подключите бота в Telegram Business.",
                 parse_mode="HTML",
             )
+        elif text.startswith("/privet"):
+            if not self.is_admin(user_id):
+                await self.api.send_message(chat_id, PUBLIC_INFO_TEXT, parse_mode="HTML")
+                return
+            parts = text.split(maxsplit=1)
+            if len(parts) < 2 or not parts[1].strip():
+                current = self.db.get_owner_setting(user_id, "greeting_text", "")
+                if current:
+                    await self.api.send_message(
+                        chat_id,
+                        "<b>Текущее приветствие</b>\n\n"
+                        f"{html.escape(current)}\n\n"
+                        "Чтобы изменить, напиши: <code>/privet новый текст</code>",
+                        parse_mode="HTML",
+                    )
+                else:
+                    await self.api.send_message(
+                        chat_id,
+                        "Приветствие пока не задано.\n\n"
+                        "Формат: <code>/privet Привет! Спасибо, что написали 🙌</code>\n\n"
+                        "Бот сам отправит этот текст каждому новому человеку, "
+                        "который впервые напишет в подключенный Business-чат.",
+                        parse_mode="HTML",
+                    )
+                return
+            greeting_text = parts[1].strip()[:500]
+            self.db.set_owner_setting(user_id, "greeting_text", greeting_text)
+            await self.api.send_message(
+                chat_id,
+                "<b>Приветствие сохранено ✅</b>\n\n"
+                f"{html.escape(greeting_text)}",
+                parse_mode="HTML",
+            )
         elif text == "/settings":
             if not self.is_admin(user_id):
                 await self.api.send_message(chat_id, PUBLIC_INFO_TEXT, parse_mode="HTML")
@@ -1494,13 +1572,15 @@ class HelperBot:
             code = text.strip().upper()
             if self.db.redeem_invite_code(code, user_id):
                 self.db.set_setting(f"register_state:{user_id}", "awaiting_name")
-                await self.api.send_message(
+                sent = await self.api.send_message(
                     chat_id,
                     "<b>Код принят</b>\n\n"
                     "Теперь напиши имя, которое будет в автоответах.\n\n"
                     "Например: <code>Артем</code>",
                     parse_mode="HTML",
                 )
+                if isinstance(sent, dict) and sent.get("message_id") is not None:
+                    self.remember_registration_message(user_id, int(sent["message_id"]))
             else:
                 await self.api.send_message(
                     chat_id,
@@ -1514,6 +1594,7 @@ class HelperBot:
                 return
             self.db.add_owner(user_id, display_name, username)
             self.db.set_setting(f"register_state:{user_id}", "done")
+            await self.cleanup_registration_messages(chat_id, user_id)
             await self.api.send_message(
                 chat_id,
                 "<b>Профиль готов</b>\n\n"
@@ -1542,7 +1623,7 @@ class HelperBot:
             # Убираем системное сообщение о платеже (чек со звёздами), чтобы в чате
             # сразу была чистая инструкция, а не квитанция об оплате.
             await self.api.try_call("deleteMessage", {"chat_id": chat_id, "message_id": message_id})
-        await self.api.send_message(
+        sent = await self.api.send_message(
             chat_id,
             "✅ <b>Оплата получена ⭐</b>\n\n"
             "🔑 Ключ доступа активирован.\n\n"
@@ -1550,6 +1631,8 @@ class HelperBot:
             "Например: <code>Артем</code>",
             parse_mode="HTML",
         )
+        if isinstance(sent, dict) and sent.get("message_id") is not None:
+            self.remember_registration_message(user_id, int(sent["message_id"]))
 
     async def handle_callback_query(self, query: dict[str, Any]) -> None:
         query_id = query.get("id")
@@ -1567,7 +1650,9 @@ class HelperBot:
         if data == "reg:code":
             self.db.set_setting(f"register_state:{from_user_id}", "awaiting_code")
             if chat_id is not None:
-                await self.api.send_message(chat_id, "Отправь одноразовый код приглашения.")
+                sent = await self.api.send_message(chat_id, "Отправь одноразовый код приглашения.")
+                if isinstance(sent, dict) and sent.get("message_id") is not None:
+                    self.remember_registration_message(from_user_id, int(sent["message_id"]))
             return
 
         if data == "reg:buy":
@@ -1696,16 +1781,34 @@ class HelperBot:
 
         owner_user_id = self.db.owner_for_business_connection(str(business_connection_id))
         if owner_user_id is None:
-            if self.is_superadmin(from_user_id):
-                owner_user_id = from_user_id
-            elif self.config.admin_user_id is not None:
-                # На старых установках business_connection мог не сохраниться.
-                # Привязываем неизвестное подключение к главному админу.
-                owner_user_id = self.config.admin_user_id
+            # Раньше здесь неизвестное подключение молча привязывалось к главному
+            # админу. Из-за этого команды (мут, /love и т.д.) переставали работать
+            # у реального владельца чата — сравнение "from_user_id == owner_user_id"
+            # ломалось, потому что owner_user_id был не тем человеком. Теперь вместо
+            # угадывания честно спрашиваем у Telegram, кто реальный владелец подключения.
+            connection_info = await self.api.get_business_connection(str(business_connection_id))
+            real_owner_id = None
+            real_owner: dict[str, Any] = {}
+            if isinstance(connection_info, dict):
+                real_owner = connection_info.get("user", {}) or {}
+                real_owner_id = real_owner.get("id")
+
+            if real_owner_id is not None and (
+                self.is_superadmin(int(real_owner_id)) or self.db.get_owner(int(real_owner_id)) is not None
+            ):
+                owner_user_id = int(real_owner_id)
+                if self.is_superadmin(owner_user_id) and self.db.get_owner(owner_user_id) is None:
+                    display_name = real_owner.get("first_name") or real_owner.get("username") or "Админ"
+                    self.db.add_owner(owner_user_id, display_name, real_owner.get("username"))
+                self.db.upsert_business_connection(str(business_connection_id), owner_user_id, True)
             else:
-                logging.warning("Skipped business message from unregistered connection=%s", business_connection_id)
+                logging.warning(
+                    "Skipped business message from unresolved/unregistered connection=%s",
+                    business_connection_id,
+                )
                 return
-            self.db.upsert_business_connection(str(business_connection_id), int(owner_user_id), True)
+
+        is_new_chat = not self.db.chat_exists(str(business_connection_id), int(chat_id))
 
         self.db.upsert_managed_chat(
             business_connection_id=business_connection_id,
@@ -1723,6 +1826,11 @@ class HelperBot:
         )
 
         is_owner_message = from_user_id == owner_user_id
+
+        if is_new_chat and not is_owner_message:
+            greeting_text = self.db.get_owner_setting(owner_user_id, "greeting_text", "")
+            if greeting_text:
+                await self.send_business_message_and_remember(chat_id, greeting_text, business_connection_id)
         if text.startswith("/") and is_owner_message:
             await self.handle_business_command(
                 business_connection_id=business_connection_id,
@@ -1778,6 +1886,11 @@ class HelperBot:
 
         parts = text.split()
         command = parts[0].lower()
+
+        if not re.search(r"[a-zа-яё]", command, re.IGNORECASE):
+            # Сообщение вроде "/", "/.", "/..." — не настоящая команда,
+            # молча игнорируем вместо "не понял команду".
+            return
 
         if command == "/mute":
             mute_until = None
@@ -1936,16 +2049,36 @@ class HelperBot:
         elif command == "/love":
             await self.api.delete_business_messages(business_connection_id, [message_id])
             await self.send_love_animation(chat_id, business_connection_id)
-        elif command == "/flip":
+        elif command == "/kazino":
             await self.api.delete_business_messages(business_connection_id, [message_id])
-            result = secrets.choice(["🦅 Орёл", "🔢 Решка"])
+            await self.api.send_dice(chat_id, "🎰", business_connection_id=business_connection_id)
+        elif command == "/spamtest":
+            await self.api.delete_business_messages(business_connection_id, [message_id])
+            if len(parts) < 3 or not parts[1].isdigit():
+                await self.send_temporary_business_message(
+                    chat_id,
+                    "Формат: <code>/spamtest 10 текст</code>\nОтправит до 20 сообщений прямо в этот чат.",
+                    business_connection_id,
+                    parse_mode="HTML",
+                )
+                return
+            count = max(1, min(int(parts[1]), 20))
+            test_text = " ".join(parts[2:]).strip()[:500]
+            if not test_text:
+                await self.send_temporary_business_message(
+                    chat_id,
+                    "Текст для <code>/spamtest</code> пустой.",
+                    business_connection_id,
+                    parse_mode="HTML",
+                )
+                return
             await self.send_temporary_business_message(
                 chat_id,
-                f"🪙 <b>Монетка:</b> {result}",
+                f"🧪 Тест запущен: <code>{count}</code> сообщений.",
                 business_connection_id,
                 parse_mode="HTML",
-                delay_seconds=15,
             )
+            asyncio.create_task(self.send_test_spam_messages(chat_id, test_text, business_connection_id, count))
         elif command == "/rps":
             await self.api.delete_business_messages(business_connection_id, [message_id])
             await self.handle_rps_command(chat_id, business_connection_id, parts)
